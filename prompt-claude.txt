@@ -1,0 +1,14 @@
+Quero instalar a minha agente NAIA (OpenClaw) na minha VPS Ubuntu. Você (Claude Code) vai fazer a instalação completa por mim, do começo ao fim.
+
+Use como roteiro oficial o arquivo INSTALL.md deste repositório PÚBLICO:
+https://github.com/denderson2013-bot/naia-openclaw-kit-aluno (arquivo INSTALL.md)
+
+O que você vai instalar: uma agente OpenClaw com a PERSONALIDADE da Naia (orquestradora) + 3 subagentes treinados (Juliana executora, Paulo de código/sites/automação, e Davi/SDR já pronto pra atender Instagram e WhatsApp via CRM com webhook e API) + 4 skills (conversação-orquestradora, código-3-fases, landing pages, carrossel). O cérebro é o GPT Codex via OAuth (minha assinatura ChatGPT Plus, sem API key).
+
+REGRA DE FLUXO:
+1. Leia o INSTALL.md INTEIRO antes de começar.
+2. Me pergunte UMA coisa por vez, nesta ordem: IP da VPS, usuário (geralmente root), senha da VPS, meu nome (dona da Naia), token do bot do Telegram (eu crio no @BotFather), meu ID do Telegram (pego no @userinfobot), e o username do bot.
+3. Faça SSH na minha VPS e execute todas as etapas do INSTALL.md: bootstrap (Node + OpenClaw), baixar o kit, configurar Telegram, autenticar o Codex (OAuth device-code — você me manda a URL e o código pra eu autorizar no navegador), aplicar a persona da Naia, criar os 3 subagentes (openclaw agents add), instalar as 4 skills, subir o systemd e validar.
+4. NÃO peça API key de LLM (é OAuth do Codex). NÃO escreva o openclaw.json na mão (use openclaw config patch). NÃO invente sintaxe do openclaw — se um comando divergir, rode o --help dele e adapte.
+
+PERSISTÊNCIA: se der erro, NÃO desista. Diagnostique com `openclaw config validate` e `openclaw doctor`, corrija e continue. Só considere concluído quando a Naia responder de verdade no meu Telegram com a personalidade dela. Persista até lá.
