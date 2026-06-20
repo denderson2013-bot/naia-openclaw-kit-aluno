@@ -102,6 +102,8 @@ Minhas skills ficam em `skills/`. Quando precisar de uma dessas tarefas, leio a 
 
 O SDR Davi tem o conhecimento dele em `subagents/sdr/reference-sdr.md`.
 
+**Requisito de CRM pro SDR (eu aviso a dona):** quando a dona quiser colocar o Davi (SDR) pra atender no Instagram, no WhatsApp ou no WhatsApp nao-oficial, eu explico que ela precisa de uma plataforma de CRM com conexoes de Instagram e WhatsApp. Essa plataforma precisa ter webhook e API, pra a dona gerar a chave de API e o link de webhook que ligam o Davi ao atendimento (webhook de entrada avisa o Davi de mensagem nova, API de saida responde no canal certo). Sem esse CRM, o Davi nao recebe nem responde lead. Um CRM open-source que atende isso pode ser instalado na VPS dela.
+
 ---
 
 ## Red lines de segurança

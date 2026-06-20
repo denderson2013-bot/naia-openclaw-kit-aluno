@@ -1,7 +1,7 @@
 # Referência do Davi (SDR) — Treinamento, Integração CRM e Deploy
 
 > Knowledge consolidado do SDR Davi da Naia OpenClaw.
-> Documento auto-suficiente. Quem montar a infra do Davi (a Juliana) e o próprio Davi devem conseguir, lendo só este arquivo: montar o dossiê de treinamento por nicho (BMAD + SPIN, com validação cega), conectar Instagram DM + WhatsApp via CRM Avalanche (webhook de ENTRADA + API de SAÍDA), qualificar, agendar, registrar no pipeline, rastrear vendas e fazer o deploy.
+> Documento auto-suficiente. Quem montar a infra do Davi (a Juliana) e o próprio Davi devem conseguir, lendo só este arquivo: montar o dossiê de treinamento por nicho (BMAD + SPIN, com validação cega), conectar Instagram DM + WhatsApp via seu CRM (webhook de ENTRADA + API de SAÍDA), qualificar, agendar, registrar no pipeline, rastrear vendas e fazer o deploy.
 > Licença: MIT. Toda credencial aqui é placeholder. O aluno preenche os valores reais na instalação.
 
 ---
@@ -102,7 +102,7 @@ Obrigatório:
 - Tom de voz desejado pro Davi (formal? casual? técnico? amigável?)
 - Nome do agente (como vai se apresentar; aqui usamos Davi como padrão)
 - Nomes para bloquear (sócios, família, funcionários que não devem receber mensagem)
-- Chave API do CRM Avalanche e Location ID
+- Chave API do seu CRM e Location ID
 - Público-alvo descrito em detalhes
 
 Opcional (recomendado): Calendar ID (se tiver agendamento), webhook de venda (Hotmart/Kiwify), exemplos de conversas reais que deram certo, objeções comuns, FAQ, material de treinamento existente.
@@ -462,7 +462,7 @@ CALENDAR_ID = CFG.get('calendar_id', ''); SPIN_FLOW = CFG.get('spin_flow', '')
 CHANNEL_TYPE = CFG.get('channel_type', 'IG'); SEND_METHOD = CFG.get('send_method', 'api')
 SEND_WEBHOOK_URL = CFG.get('send_webhook_url', '')
 BRT = timezone(timedelta(hours=-3))
-CRM_BASE = 'https://<CRM_API_BASE>'   # endpoint da API do CRM Avalanche (o aluno preenche)
+CRM_BASE = 'https://<CRM_API_BASE>'   # endpoint da API do seu CRM (o aluno preenche)
 
 # TROQUE user/password/dbname pelos seus valores
 def get_db():
@@ -647,13 +647,13 @@ curl localhost:3501/health
 
 # PARTE III — INTEGRAÇÃO CRM AVALANCHE
 
-O Davi se conecta ao Instagram DM e ao WhatsApp através do CRM Avalanche. O CRM é a borda: ele recebe a mensagem do lead em qualquer canal e avisa o Davi (webhook de ENTRADA); o Davi responde chamando a API do CRM (SAÍDA), e o CRM entrega no canal certo.
+O Davi se conecta ao Instagram DM e ao WhatsApp através do seu CRM. O CRM é a borda: ele recebe a mensagem do lead em qualquer canal e avisa o Davi (webhook de ENTRADA); o Davi responde chamando a API do CRM (SAÍDA), e o CRM entrega no canal certo.
 
 ## 13. Credenciais do CRM (placeholders)
 
-Você precisa de 3 coisas, todas tiradas da sub-account do cliente no CRM Avalanche. NUNCA versione os valores reais; eles ficam só no config do agente na instalação:
+Você precisa de 3 coisas, todas tiradas da sub-account do cliente no seu CRM. NUNCA versione os valores reais; eles ficam só no config do agente na instalação:
 
-- Base da API: `https://<CRM_API_BASE>` (endpoint REST do CRM Avalanche)
+- Base da API: `https://<CRM_API_BASE>` (endpoint REST do seu CRM)
 - API Key (token de integração privada): `<CRM_API_TOKEN>` — em Settings → Business Profile → API Keys. Permissões mínimas: Contacts (read/write), Conversations (read/write), Calendars (read).
 - Location ID: `<CRM_LOCATION_ID>` — visível na URL da sub-account, ou em Settings → Business Profile → Location ID.
 - Version header: `2021-07-28`.
@@ -700,7 +700,7 @@ O campo `type` define o canal e tem que ser o correto, senão dá erro 422:
 
 Ex.: se o lead veio pelo WhatsApp e você responde com `type: "IG"`, o CRM retorna "Contact has no Instagram id, skipping". O campo `channel_type` do config define qual usar (padrão `IG`).
 
-A API do CRM Avalanche também permite ao Davi (e à Juliana montando a infra): listar/buscar/criar/atualizar contatos, adicionar/remover tags, atribuir contato a um vendedor (assignedTo), gerenciar notas e tasks; buscar conversas por contato, ler mensagens, enviar (SMS/Email/WhatsApp/IG DM), marcar como lida; listar calendários e slots livres, criar/atualizar/cancelar appointments; listar pipelines e stages, criar/mover/atualizar oportunidades e mudar status (open/won/lost/abandoned). Não tem endpoint para: criar/editar workflows (só leitura, edição na interface), builder visual de funnels/sites, templates de WhatsApp (gerenciados na interface).
+A API do seu CRM também permite ao Davi (e à Juliana montando a infra): listar/buscar/criar/atualizar contatos, adicionar/remover tags, atribuir contato a um vendedor (assignedTo), gerenciar notas e tasks; buscar conversas por contato, ler mensagens, enviar (SMS/Email/WhatsApp/IG DM), marcar como lida; listar calendários e slots livres, criar/atualizar/cancelar appointments; listar pipelines e stages, criar/mover/atualizar oportunidades e mudar status (open/won/lost/abandoned). Não tem endpoint para: criar/editar workflows (só leitura, edição na interface), builder visual de funnels/sites, templates de WhatsApp (gerenciados na interface).
 
 ## 16. Instagram DM passo a passo
 
@@ -828,7 +828,7 @@ Métricas de saúde: uptime >99.5%, tempo médio de resposta 15-25s, erros 422 <
 
 ## 26. Checklist final de deploy
 
-Contas e acessos: GitHub (repo privado + token), Vercel (logado com GitHub), Cloudflare (domínio + nameservers), Hostinger (VPS + IP + SSH), Anthropic (crédito + API key), CRM Avalanche (sub-account + token + Location ID + Instagram conectado), Hotmart/Kiwify (produto + checkout).
+Contas e acessos: GitHub (repo privado + token), Vercel (logado com GitHub), Cloudflare (domínio + nameservers), Hostinger (VPS + IP + SSH), Anthropic (crédito + API key), seu CRM (sub-account + token + Location ID + Instagram conectado), Hotmart/Kiwify (produto + checkout).
 
 Servidor: sistema atualizado; Python 3.10+; Node 18+; PM2 com `pm2 startup`; PostgreSQL rodando; Caddy rodando; `ANTHROPIC_API_KEY` no `~/.bashrc`; Whisper instalado.
 
