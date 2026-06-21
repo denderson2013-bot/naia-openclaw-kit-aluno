@@ -103,7 +103,7 @@ cp /opt/naia-kit/workspace/USER.md      "$WS/USER.md"
 sed -i "s/{{OWNER_NAME}}/$OWNER_NAME/g; s/{{OWNER_TELEGRAM_ID}}/$TELEGRAM_USER_ID/g" "$WS/SOUL.md" "$WS/AGENTS.md" "$WS/IDENTITY.md" "$WS/USER.md"
 # remove o BOOTSTRAP.md genérico se existir (a persona já vem pronta)
 rm -f "$WS/BOOTSTRAP.md"
-openclaw agents set-identity --name "Naia" 2>/dev/null || true
+openclaw agents set-identity --agent main --name "Naia" 2>/dev/null || true
 ```
 
 ---
