@@ -18,13 +18,13 @@
 7. Validação cega + bateria de 20 cenários
 
 ### PARTE II — INFRAESTRUTURA
-8. Setup do servidor (Hostinger)
+8. Setup do servidor (sua VPS)
 9. Banco PostgreSQL + tabelas
 10. Config JSON do agente
-11. Template Python (FastAPI + Claude Agent SDK)
+11. Template Python (FastAPI + LLM)
 12. Deploy + PM2
 
-### PARTE III — INTEGRAÇÃO CRM AVALANCHE
+### PARTE III — INTEGRAÇÃO COM O SEU CRM
 13. Credenciais do CRM (placeholders)
 14. Webhook de ENTRADA (CRM → /webhook)
 15. Envio de SAÍDA (API do CRM)
@@ -36,7 +36,7 @@
 21. Como o lead chega do Instagram via comentário → DM (automação)
 
 ### PARTE IV — TRACKING, OBSERVABILIDADE E LANÇAMENTO
-22. Tracking de vendas Hotmart/Kiwify (parâmetro src)
+22. Tracking de vendas na sua plataforma de checkout (parâmetro src)
 23. Monitoramento + queries SQL
 24. Ramp-up e métricas de produção
 25. Troubleshooting comum
@@ -102,10 +102,10 @@ Obrigatório:
 - Tom de voz desejado pro Davi (formal? casual? técnico? amigável?)
 - Nome do agente (como vai se apresentar; aqui usamos Davi como padrão)
 - Nomes para bloquear (sócios, família, funcionários que não devem receber mensagem)
-- Chave API do seu CRM e Location ID
+- Chave de API do seu CRM e o ID da conta no CRM
 - Público-alvo descrito em detalhes
 
-Opcional (recomendado): Calendar ID (se tiver agendamento), webhook de venda (Hotmart/Kiwify), exemplos de conversas reais que deram certo, objeções comuns, FAQ, material de treinamento existente.
+Opcional (recomendado): ID do calendário (se tiver agendamento), webhook de venda da sua plataforma de checkout/pagamento, exemplos de conversas reais que deram certo, objeções comuns, FAQ, material de treinamento existente.
 
 ### 2.4 O que fica de FORA do dossiê
 
@@ -323,9 +323,9 @@ Erros comuns: copiar dossiê de outro cliente sem adaptar; omitir anti-patterns;
 
 # PARTE II — INFRAESTRUTURA
 
-## 8. Setup do servidor (Hostinger)
+## 8. Setup do servidor (sua VPS)
 
-VPS recomendado KVM 2 ou superior (4 vCPU, 8GB RAM), Ubuntu 22.04 LTS. Cada agente usa ~100MB de RAM, então 8GB suporta dezenas em paralelo.
+VPS recomendada de 4 vCPU e 8GB RAM em qualquer provedor de VPS, Ubuntu 22.04 LTS. Cada agente usa ~100MB de RAM, então 8GB suporta dezenas em paralelo.
 
 ```bash
 sudo apt update && sudo apt upgrade -y
@@ -352,12 +352,12 @@ Caddyfile (cada agente em uma porta):
 agente.seudominio.com.br { reverse_proxy localhost:3501 }
 painel.seudominio.com.br { reverse_proxy localhost:3600 }
 ```
-Recarregar: `sudo systemctl reload caddy`. No Cloudflare, o DNS do subdomínio do webhook é tipo A apontando pro IP do servidor (proxy ON), não CNAME pra Vercel.
+Recarregar: `sudo systemctl reload caddy`. No seu provedor de DNS, o subdomínio do webhook é um registro tipo A apontando pro IP do servidor onde o Davi roda.
 
-API key da Anthropic e pacotes Python:
+Chave de API do provedor de LLM do SDR e pacotes Python (o Davi roda como um serviço próprio, separado do cérebro Codex da Naia; ele precisa da sua própria chave de LLM e de um CRM conectado):
 ```bash
-echo 'export ANTHROPIC_API_KEY="<ANTHROPIC_API_KEY>"' >> ~/.bashrc && source ~/.bashrc
-pip install httpx psycopg2-binary fastapi uvicorn claude-agent-sdk openai-whisper
+echo 'export LLM_API_KEY="<LLM_API_KEY>"' >> ~/.bashrc && source ~/.bashrc
+pip install httpx psycopg2-binary fastapi uvicorn openai-whisper
 ```
 
 ## 9. Banco PostgreSQL + tabelas
@@ -434,14 +434,14 @@ Cada agente tem um `config-N.json` (N = id no banco). Todos usam o MESMO templat
 
 Campos-chave: `channel_type` (`IG` Instagram, `WhatsApp` oficial, `SMS` não oficial/SMS, `Email`, `FB`); `receive_method` = `webhook` (CRM envia pra nós); `send_method` = `api` (enviamos via API do CRM) ou `webhook`. Convenção de portas: um agente por porta (3500, 3501, 3502...).
 
-## 11. Template Python (FastAPI + Claude Agent SDK)
+## 11. Template Python (FastAPI + SDK do provedor de LLM)
 
-Estrutura por bloco. Carrega config pelo id passado como argumento, conecta no Postgres, carrega o material de treinamento do banco, gera resposta com o Claude Agent SDK, faz debounce de 8s pra agrupar mensagens quebradas, e expõe `/webhook`, `/health` e `/reload-training`.
+Estrutura por bloco. Carrega config pelo id passado como argumento, conecta no Postgres, carrega o material de treinamento do banco, gera resposta com o SDK do provedor de LLM do SDR, faz debounce de 8s pra agrupar mensagens quebradas, e expõe `/webhook`, `/health` e `/reload-training`. O exemplo abaixo usa um cliente de LLM genérico via `LLM_API_KEY`; troque pelo SDK do provedor que você escolher.
 
 ```python
 #!/usr/bin/env python3
 """SDR Agent Template — agente de vendas automatizado via IA"""
-import asyncio, json, re, sys, time
+import asyncio, json, os, re, sys, time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import httpx, psycopg2
@@ -449,7 +449,9 @@ from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, TextBlock
+# Importe aqui o SDK/cliente do provedor de LLM que você escolheu pro SDR.
+# Ele precisa da chave em LLM_API_KEY (definida no ~/.bashrc, seção 8).
+LLM_API_KEY = os.environ.get('LLM_API_KEY', '')
 
 AGENT_ID = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 CFG = json.load(open(Path(__file__).parent / f'config-{AGENT_ID}.json'))
@@ -488,7 +490,7 @@ def load_training_files(agent_id):
 TRAINING_CONTEXT = load_training_files(AGENT_ID)
 
 http = httpx.AsyncClient(timeout=15)
-CRM_HEADERS = {'Authorization': f'Bearer {CRM_API_KEY}', 'Version': '2021-07-28', 'Content-Type': 'application/json'}
+CRM_HEADERS = {'Authorization': f'Bearer {CRM_API_KEY}', 'Content-Type': 'application/json'}  # adicione aqui os headers que o SEU CRM exigir
 
 async def send_message(contact_id, message):
     if SEND_METHOD == 'webhook' and SEND_WEBHOOK_URL:
@@ -525,7 +527,7 @@ async def update_contact_crm(contact_id, phone, email):
     if email: body['email'] = email
     await http.put(f'{CRM_BASE}/contacts/{contact_id}', headers=CRM_HEADERS, json=body)
 
-async def generate_with_claude(name, message, history, available_slots=''):
+async def generate_with_llm(name, message, history, available_slots=''):
     exchange_count = history.count('LEAD:')
     links_text = '\n'.join(f'- {l}' for l in ALLOWED_LINKS) if ALLOWED_LINKS else 'Nenhum link configurado'
     if SPIN_FLOW:
@@ -556,12 +558,13 @@ HISTÓRICO ({exchange_count} trocas): {history[:2000] or 'Primeira interação'}
 LEAD: {name}
 MENSAGEM: {message[:300]}
 Responda (separe com |||):"""
-    options = ClaudeAgentOptions(max_turns=1)
+    # Chame aqui o provedor de LLM escolhido (use LLM_API_KEY) passando `prompt`
+    # e devolvendo só o texto da resposta. Ex. genérico com chat completions:
+    #   r = await http.post('<LLM_API_BASE>/chat/completions',
+    #       headers={'Authorization': f'Bearer {LLM_API_KEY}'},
+    #       json={'model': '<LLM_MODEL>', 'messages': [{'role': 'user', 'content': prompt}]})
+    #   result_text = r.json()['choices'][0]['message']['content']
     result_text = ''
-    async for msg in query(prompt=prompt, options=options):
-        if isinstance(msg, AssistantMessage):
-            for block in msg.content:
-                if isinstance(block, TextBlock): result_text += block.text
     return result_text.strip() or None
 
 DEBOUNCE_SECONDS = 8
@@ -603,7 +606,7 @@ async def handle_message(contact_id, name, message):
             re.sub(r'\D', '', phone_match.group()) if phone_match else None,
             email_match.group() if email_match else None)
     await asyncio.sleep(8)  # simula tempo de digitação
-    reply = await generate_with_claude(name, message, history)
+    reply = await generate_with_llm(name, message, history)
     if not reply: return
     msgs = [m.strip() for m in reply.split('|||') if m.strip()]
     for i, msg in enumerate(msgs):
@@ -645,36 +648,38 @@ curl localhost:3501/health
 
 ---
 
-# PARTE III — INTEGRAÇÃO CRM AVALANCHE
+# PARTE III — INTEGRAÇÃO COM O SEU CRM
 
-O Davi se conecta ao Instagram DM e ao WhatsApp através do seu CRM. O CRM é a borda: ele recebe a mensagem do lead em qualquer canal e avisa o Davi (webhook de ENTRADA); o Davi responde chamando a API do CRM (SAÍDA), e o CRM entrega no canal certo.
+O Davi se conecta ao Instagram DM e ao WhatsApp através do seu CRM. O CRM é a borda: ele recebe a mensagem do lead em qualquer canal e avisa o Davi (webhook de ENTRADA); o Davi responde chamando a API do CRM (SAÍDA), e o CRM entrega no canal certo. A ideia geral: seu CRM precisa ter webhook de ENTRADA (avisa o Davi de mensagem nova) e API de SAÍDA (Davi responde). Qualquer CRM que ofereça essas duas coisas serve.
 
 ## 13. Credenciais do CRM (placeholders)
 
-Você precisa de 3 coisas, todas tiradas da sub-account do cliente no seu CRM. NUNCA versione os valores reais; eles ficam só no config do agente na instalação:
+Você precisa de 3 coisas, todas tiradas da sua conta no CRM. NUNCA versione os valores reais; eles ficam só no config do agente na instalação:
 
 - Base da API: `https://<CRM_API_BASE>` (endpoint REST do seu CRM)
-- API Key (token de integração privada): `<CRM_API_TOKEN>` — em Settings → Business Profile → API Keys. Permissões mínimas: Contacts (read/write), Conversations (read/write), Calendars (read).
-- Location ID: `<CRM_LOCATION_ID>` — visível na URL da sub-account, ou em Settings → Business Profile → Location ID.
-- Version header: `2021-07-28`.
-- Calendar ID (opcional, pra agendamento): `<CRM_CALENDAR_ID>` — Settings → Calendars → ID na URL.
+- API Key (token de integração privada): `<CRM_API_TOKEN>` — gerada nas configurações de API/integração do seu CRM. Permissões mínimas: contatos (leitura/escrita), conversas (leitura/escrita), calendários (leitura).
+- ID da conta no CRM: `<CRM_LOCATION_ID>` — o identificador da sua conta/workspace no CRM.
+- Headers extras: alguns CRMs exigem headers adicionais (ex.: versão da API). Confira a documentação do seu CRM e adicione em `CRM_HEADERS`.
+- ID do calendário (opcional, pra agendamento): `<CRM_CALENDAR_ID>` — o identificador do calendário no seu CRM.
 
 ## 14. Webhook de ENTRADA (CRM → /webhook)
 
-O CRM avisa o Davi toda vez que um lead manda mensagem, via um Workflow.
+O CRM avisa o Davi toda vez que um lead manda mensagem, via uma automação que dispara um webhook.
 
-1. Na sub-account: Automation → Workflows → Create Workflow → Start from scratch. Nome: "Webhook Davi — Instagram" (ou WhatsApp/SMS).
-2. Trigger: **Customer Replied**. Em Filters → Reply Channel, escolha o canal: `Instagram`, `WhatsApp`, ou `SMS/Phone`/`All` pra WhatsApp não oficial. Isso garante que só o canal certo dispara.
-3. Action → Webhook (Custom Webhook): Method POST, URL `https://agente.seudominio.com.br/webhook`, header `Content-Type: application/json`, body JSON:
+1. No seu CRM, crie uma automação que dispara um webhook quando chega mensagem nova de um lead. Dê um nome claro (ex.: "Webhook Davi — Instagram", ou WhatsApp/SMS).
+2. Configure pra disparar quando o lead responde, filtrando pelo canal desejado (Instagram, WhatsApp, ou SMS/telefone pro WhatsApp não oficial). Isso garante que só o canal certo dispara. Se o seu CRM não tiver filtro de canal, dispare em qualquer mensagem nova e trate o canal pelo conteúdo do payload.
+3. A ação é um webhook HTTP: Method POST, URL `https://agente.seudominio.com.br/webhook`, header `Content-Type: application/json`, body JSON com os campos do contato e da mensagem (use as variáveis/merge fields do seu CRM):
 ```json
 {
-  "contact_id": "{{contact.id}}",
-  "full_name": "{{contact.full_name}}",
-  "first_name": "{{contact.first_name}}",
-  "message": { "body": "{{message.body}}" }
+  "contact_id": "<id do contato no CRM>",
+  "full_name": "<nome completo do contato>",
+  "first_name": "<primeiro nome do contato>",
+  "message": { "body": "<corpo da mensagem recebida>" }
 }
 ```
-4. Save e ativar o workflow (toggle ON). A URL aponta pro servidor onde o Davi roda; o Caddy faz o reverse proxy pra porta do agente.
+Preencha cada valor com a variável/merge field correspondente do seu CRM. O Davi espera exatamente esses nomes de campo (`contact_id`, `full_name`, `first_name`, `message.body`).
+
+4. Salve e ative a automação. A URL aponta pro servidor onde o Davi roda; o Caddy faz o reverse proxy pra porta do agente.
 
 ## 15. Envio de SAÍDA (API do CRM)
 
@@ -682,11 +687,11 @@ O Davi responde chamando:
 ```
 POST https://<CRM_API_BASE>/conversations/messages
 Authorization: Bearer <CRM_API_TOKEN>
-Version: 2021-07-28
 Content-Type: application/json
 
 { "type": "TIPO_DO_CANAL", "contactId": "ID_DO_CONTATO", "message": "Texto" }
 ```
+(O endpoint, os nomes dos campos e quaisquer headers extras dependem do seu CRM; ajuste conforme a documentação dele.)
 
 O campo `type` define o canal e tem que ser o correto, senão dá erro 422:
 
@@ -700,19 +705,19 @@ O campo `type` define o canal e tem que ser o correto, senão dá erro 422:
 
 Ex.: se o lead veio pelo WhatsApp e você responde com `type: "IG"`, o CRM retorna "Contact has no Instagram id, skipping". O campo `channel_type` do config define qual usar (padrão `IG`).
 
-A API do seu CRM também permite ao Davi (e à Juliana montando a infra): listar/buscar/criar/atualizar contatos, adicionar/remover tags, atribuir contato a um vendedor (assignedTo), gerenciar notas e tasks; buscar conversas por contato, ler mensagens, enviar (SMS/Email/WhatsApp/IG DM), marcar como lida; listar calendários e slots livres, criar/atualizar/cancelar appointments; listar pipelines e stages, criar/mover/atualizar oportunidades e mudar status (open/won/lost/abandoned). Não tem endpoint para: criar/editar workflows (só leitura, edição na interface), builder visual de funnels/sites, templates de WhatsApp (gerenciados na interface).
+A API do seu CRM também permite ao Davi (e à Juliana montando a infra): listar/buscar/criar/atualizar contatos, adicionar/remover tags, atribuir contato a um vendedor (assignedTo), gerenciar notas e tasks; buscar conversas por contato, ler mensagens, enviar (SMS/Email/WhatsApp/IG DM), marcar como lida; listar calendários e slots livres, criar/atualizar/cancelar agendamentos; listar pipelines e stages, criar/mover/atualizar oportunidades e mudar status (aberto/ganho/perdido/abandonado). O conjunto exato de endpoints varia por CRM; alguns recursos (automações, builder de funis/sites, templates de WhatsApp) costumam ser só pela interface, não pela API. Confira a documentação do seu CRM.
 
 ## 16. Instagram DM passo a passo
 
-Pré: perfil Instagram Business/Creator conectado à sub-account (Settings → Integrations → Instagram, login via Facebook). Crie o workflow da seção 14 com filtro Reply Channel = Instagram. No config: `channel_type: "IG"`. Fluxo: lead manda DM → CRM recebe → workflow dispara webhook pro Davi → Davi responde via API com `type="IG"` → lead recebe no Instagram.
+Pré: perfil Instagram Business/Creator conectado à sua conta no CRM (nas integrações do CRM). Crie a automação da seção 14 filtrando o canal Instagram. No config: `channel_type: "IG"`. Fluxo: lead manda DM → CRM recebe → automação dispara webhook pro Davi → Davi responde via API com `type="IG"` → lead recebe no Instagram.
 
 ## 17. WhatsApp Oficial (Meta) passo a passo
 
-Pré: número WhatsApp Business API configurado no CRM (via Meta Business Suite), verificado e aprovado pela Meta. Crie o workflow com filtro Reply Channel = WhatsApp. No config: `channel_type: "WhatsApp"`. Atenção à regra de janela de 24h da Meta: o Davi só pode responder dentro de 24h após a última mensagem do lead; depois disso, precisa de template aprovado pela Meta (HSM).
+Pré: número WhatsApp Business API configurado no CRM (via Meta Business Suite), verificado e aprovado pela Meta. Crie a automação da seção 14 filtrando o canal WhatsApp. No config: `channel_type: "WhatsApp"`. Atenção à regra de janela de 24h da Meta: o Davi só pode responder dentro de 24h após a última mensagem do lead; depois disso, precisa de template aprovado pela Meta (HSM).
 
 ## 18. WhatsApp não oficial passo a passo
 
-Pré: número não oficial configurado no CRM. Crie o workflow com filtro Reply Channel = SMS ou All. No config: `channel_type: "SMS"`. Diferença do oficial: sem janela de 24h, sem template aprovado, porém menos confiável (pode ser bloqueado pela Meta). Na API usa `type="SMS"`.
+Pré: número não oficial configurado no CRM. Crie a automação da seção 14 filtrando o canal SMS/telefone (ou qualquer canal). No config: `channel_type: "SMS"`. Diferença do oficial: sem janela de 24h, sem template aprovado, porém menos confiável (pode ser bloqueado pela Meta). Na API usa `type="SMS"`.
 
 ## 19. Transcrição de áudio (Whisper)
 
@@ -747,15 +752,15 @@ Handover pro Davi: o lead toca no botão `quick_reply` → o payload chega como 
 
 # PARTE IV — TRACKING, OBSERVABILIDADE E LANÇAMENTO
 
-## 22. Tracking de vendas Hotmart/Kiwify (parâmetro src)
+## 22. Tracking de vendas na sua plataforma de checkout (parâmetro src)
 
-Pra saber se uma venda veio do Davi, todo link que ele manda leva `?src=davi` (ou `?src=nome-do-agente`). A página de venda captura o parâmetro e repassa pro checkout; o webhook da Hotmart/Kiwify envia a venda com o campo `src`; o sistema registra a venda atribuída ao agente.
+Pra saber se uma venda veio do Davi, todo link que ele manda leva `?src=davi` (ou `?src=nome-do-agente`). A página de venda captura o parâmetro e repassa pro checkout; o webhook da sua plataforma de checkout/pagamento envia a venda com o campo `src`; o sistema registra a venda atribuída ao agente.
 
 JavaScript pra colar em TODA página de venda com link de checkout:
 ```javascript
 document.addEventListener('DOMContentLoaded', function() {
   var pageParams = new URLSearchParams(window.location.search);
-  document.querySelectorAll('a[href*="hotmart"], a[href*="kiwify"], a[href*="checkout"]').forEach(function(link) {
+  document.querySelectorAll('a[href*="checkout"]').forEach(function(link) {
     var url = link.href;
     pageParams.forEach(function(val, key) {
       if (!url.includes(key + '=')) { url += (url.includes('?') ? '&' : '?') + key + '=' + encodeURIComponent(val); }
@@ -765,23 +770,24 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 ```
 
-Endpoint pra receber o webhook de venda:
+Endpoint pra receber o webhook de venda (ajuste os caminhos do payload pro formato da SUA plataforma de checkout):
 ```python
 @app.post('/sales/webhook')
 async def sales_webhook(request: Request):
     data = await request.json()
+    # Os caminhos abaixo são um exemplo; cada plataforma de checkout tem o seu formato.
     product = data.get('data', {}).get('product', {}).get('name', '')
     price = data.get('data', {}).get('purchase', {}).get('price', {}).get('value', 0)
     src = data.get('data', {}).get('purchase', {}).get('tracking', {}).get('src', '')
     if src and AGENT_NAME.lower() in src.lower():
         conn = get_db(); cur = conn.cursor()
         cur.execute('INSERT INTO sdr_agent_sales (agent_id, product_name, product_price, platform, src_param, raw_payload) VALUES (%s,%s,%s,%s,%s,%s)',
-            (AGENT_ID, product, price, 'hotmart', src, json.dumps(data)))
+            (AGENT_ID, product, price, '<plataforma>', src, json.dumps(data)))
         conn.commit(); cur.close(); conn.close()
     return {'success': True}
 ```
 
-Configurar webhook no Hotmart (Ferramentas → Webhooks, eventos `PURCHASE_COMPLETE`/`PURCHASE_APPROVED`) ou Kiwify (Configurações → Webhooks). As páginas de venda sobem por GitHub → Vercel (repo privado, CNAME no Cloudflare apontando `cname.vercel-dns.com` com proxy OFF). Cada git push dispara deploy automático.
+Configure o webhook de venda no painel da sua plataforma de checkout/pagamento, apontando pro endpoint acima nos eventos de compra aprovada/completa. As páginas de venda podem subir por GitHub → hospedagem de páginas (repo privado, DNS apontando pra hospedagem). Cada git push dispara deploy automático.
 
 ## 23. Monitoramento + queries SQL
 
@@ -811,26 +817,26 @@ Audit: cada mensagem já é gravada em `dm_conversations`. Para auditoria comple
 
 ## 24. Ramp-up e métricas de produção
 
-Não jogue 100% do tráfego no Davi novo de uma vez. Ramp-up: dia 1 = 10% dos leads (monitorar erros 422, duplicadas, debounce); dia 2-3 = 25%; dia 4-7 = 50%; dia 8+ = 100%. Controlar pelo workflow do CRM (filtro por horário ou Branch → Random %), mantendo o fluxo humano ativo no restante.
+Não jogue 100% do tráfego no Davi novo de uma vez. Ramp-up: dia 1 = 10% dos leads (monitorar erros 422, duplicadas, debounce); dia 2-3 = 25%; dia 4-7 = 50%; dia 8+ = 100%. Controlar pela automação do CRM (filtro por horário ou divisão aleatória de percentual, se o seu CRM suportar), mantendo o fluxo humano ativo no restante.
 
 Métricas de saúde: uptime >99.5%, tempo médio de resposta 15-25s, erros 422 <1%, fallback (banco local em vez de CRM) <5%. Métricas de negócio: taxa de resposta do lead >30%, conversas que chegam à oferta >20%, cliques no link >50% dos que receberam, vendas atribuídas via `?src=` >80% das vendas do canal. Tempo médio de resposta esperado: 8s (debounce) + 8s (delay) + 5-10s (geração) = ~20-25s. É normal.
 
 ## 25. Troubleshooting comum
 
-- Mensagem não chega no Davi: workflow ativo no CRM? filtro de canal correto? testar a URL direto com curl; Caddy e DNS ok?
-- Recebe mas não responde: ver `pm2 logs`; `ANTHROPIC_API_KEY` configurada? pode ser rate limit.
+- Mensagem não chega no Davi: automação ativa no CRM? filtro de canal correto? testar a URL direto com curl; Caddy e DNS ok?
+- Recebe mas não responde: ver `pm2 logs`; `LLM_API_KEY` configurada? pode ser rate limit do provedor de LLM.
 - Erro 422 ao enviar: "Contact has no Instagram id" = `type` errado pro contato, ajustar `channel_type`.
 - Áudio não transcreve: Whisper instalado? URL pode ter expirado; formatos ogg/mp3/m4a/wav/opus.
-- Mensagens duplicadas: debounce de 8s resolve a maioria; checar se o CRM dispara o webhook mais de uma vez ou se há 2 workflows no mesmo trigger.
+- Mensagens duplicadas: debounce de 8s resolve a maioria; checar se o CRM dispara o webhook mais de uma vez ou se há 2 automações no mesmo gatilho.
 - Link/preço repetido ou idioma errado: reforçar na `personality` ("NUNCA envie link que já está no histórico"; "NUNCA mencione preços"; "SEMPRE responda em português brasileiro").
 - Erro 403 na API do CRM: token expirado ou sem permissão; gerar novo token e atualizar o config.
 - Canal errado: um agente por canal; nunca o mesmo agente pra dois canais.
 
 ## 26. Checklist final de deploy
 
-Contas e acessos: GitHub (repo privado + token), Vercel (logado com GitHub), Cloudflare (domínio + nameservers), Hostinger (VPS + IP + SSH), Anthropic (crédito + API key), seu CRM (sub-account + token + Location ID + Instagram conectado), Hotmart/Kiwify (produto + checkout).
+Contas e acessos: GitHub (repo privado + token), hospedagem de páginas (logada com GitHub), provedor de DNS (domínio + nameservers), sua VPS (IP + SSH), provedor de LLM do SDR (crédito + API key), seu CRM (conta + token + ID da conta + Instagram conectado), sua plataforma de checkout/pagamento (produto + checkout).
 
-Servidor: sistema atualizado; Python 3.10+; Node 18+; PM2 com `pm2 startup`; PostgreSQL rodando; Caddy rodando; `ANTHROPIC_API_KEY` no `~/.bashrc`; Whisper instalado.
+Servidor: sistema atualizado; Python 3.10+; Node 18+; PM2 com `pm2 startup`; PostgreSQL rodando; Caddy rodando; `LLM_API_KEY` no `~/.bashrc`; Whisper instalado.
 
 Banco: usuário/banco criados; 5 tabelas criadas; agente em `sdr_agents` (status active); dossiê em `sdr_agent_files`.
 
@@ -838,11 +844,11 @@ Agente: `template.py` no servidor; `config-N.json` correto; `get_db()` com crede
 
 Rede/SSL: DNS tipo A pro webhook (proxy ON); Caddy configurado e recarregado; HTTPS funcionando.
 
-CRM: Instagram conectado; workflow "Customer Replied" criado; filtro de canal; action Send Webhook com a URL certa; body JSON correto; workflow ativado.
+CRM: Instagram conectado; automação de "mensagem nova do lead" criada; filtro de canal; ação de webhook com a URL certa; body JSON correto; automação ativada.
 
-Páginas de venda: no GitHub; importadas na Vercel; domínio custom; CNAME proxy OFF; JS de `?src=` funcionando.
+Páginas de venda: no GitHub; publicadas na sua hospedagem de páginas; domínio custom; DNS apontando pra hospedagem; JS de `?src=` funcionando.
 
-Vendas: links com `?src=davi`; webhook Hotmart/Kiwify apontando pro endpoint; eventos corretos.
+Vendas: links com `?src=davi`; webhook da plataforma de checkout/pagamento apontando pro endpoint; eventos corretos.
 
 Teste end-to-end: mandar DM de outro perfil; ver nos logs que chegou; ver que o Davi gerou resposta; ver a resposta no Instagram; clicar no link e confirmar `?src=`; compra teste cair em `sdr_agent_sales`.
 

@@ -77,10 +77,12 @@ VPS é headless → use device-code:
 ```bash
 openclaw models auth login --provider openai --device-code
 ```
-O CLI imprime uma **URL** (`https://auth.openai.com/codex/device`) e um **Code**. Capture os dois e mande pro aluno:
-> "Abre `https://auth.openai.com/codex/device` no navegador do seu PC já logado no ChatGPT Plus, digita o código **<CODE>**, autoriza. Não precisa colar nada de volta — o CLI detecta sozinho."
+O CLI imprime no stdout uma **URL** (`https://auth.openai.com/codex/device`) e um **Code** (algo tipo `ABCD-1234`). Você (o agente) DEVE extrair do stdout a URL real e o CODE real e mandar pro aluno a mensagem JÁ com o código preenchido — NUNCA mande o texto literal `<CODE>`, troque pelo valor real que apareceu. Modelo da mensagem (substitua `<CODE>` pelo código que você leu):
+> "Abre `https://auth.openai.com/codex/device` no navegador do seu PC já logado no ChatGPT Plus, digita o código **<CODE>** e autoriza. Não precisa colar nada de volta — o CLI detecta sozinho. Me avisa aqui quando autorizar."
 
-No modo remoto, rode esse comando com `ssh_run_tty` e leia o stdout pra extrair URL e Code. Espere `OpenAI device code complete`, depois:
+DEPOIS de mandar, ESPERE o aluno confirmar que autorizou — não siga adiante antes disso. Se o login expirar ou der timeout antes de ele autorizar, rode o comando de novo (`openclaw models auth login --provider openai --device-code`), extraia o NOVO código e mande de novo pro aluno. Não invente flags novas: se o login divergir nesta versão, rode `openclaw models auth --help` e adapte.
+
+No modo remoto, rode esse comando com `ssh_run_tty` e leia o stdout pra extrair a URL e o Code reais. Espere `OpenAI device code complete` (e a confirmação do aluno), depois:
 ```bash
 openclaw models set openai/gpt-5.5
 openclaw config validate
@@ -98,7 +100,7 @@ cp /opt/naia-kit/workspace/SOUL.md      "$WS/SOUL.md"
 cp /opt/naia-kit/workspace/AGENTS.md    "$WS/AGENTS.md"
 cp /opt/naia-kit/workspace/IDENTITY.md  "$WS/IDENTITY.md"
 cp /opt/naia-kit/workspace/USER.md      "$WS/USER.md"
-sed -i "s/{{OWNER_NAME}}/$OWNER_NAME/g" "$WS/USER.md" "$WS/IDENTITY.md" "$WS/AGENTS.md"
+sed -i "s/{{OWNER_NAME}}/$OWNER_NAME/g; s/{{OWNER_TELEGRAM_ID}}/$TELEGRAM_USER_ID/g" "$WS/SOUL.md" "$WS/AGENTS.md" "$WS/IDENTITY.md" "$WS/USER.md"
 # remove o BOOTSTRAP.md genérico se existir (a persona já vem pronta)
 rm -f "$WS/BOOTSTRAP.md"
 openclaw agents set-identity --name "Naia" 2>/dev/null || true

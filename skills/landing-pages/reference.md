@@ -16,7 +16,7 @@ Quando o dono pedir uma landing nova, o agente SEMPRE executa este protocolo ANT
 Antes de propor qualquer estilo, perguntar e registrar:
 
 1. Tema ou produto da landing (o que esta sendo vendido ou comunicado).
-2. CTA principal (link Hotmart, formulario, agendamento, checkout, etc).
+2. CTA principal (link de checkout, formulario, agendamento, etc).
 3. Dominio desejado (ex: `meusite.seudominio.com.br`, `nome.seudominio.com.br`).
 4. Pixel e tracking (Meta Pixel ID, GA4, GTM, etc).
 5. Foto ou material visual disponivel (avatares, fotos de bastidor, logos).
@@ -540,7 +540,7 @@ Lista de erros conhecidos. Quebrar qualquer uma destas custa horas de debug.
 11. **Nunca usar `package.json` em projeto puramente estatico.** Vercel pode interpretar errado e tentar build Next.js.
 12. **OG image obrigatoria em landing comercial.** Sem `og:image`, link no WhatsApp/Telegram fica sem preview e perde 30% de cliques.
 13. **Pixel/tracking obrigatorio se for landing comercial.** Sem Meta Pixel ou GA, nao tem como medir conversao.
-14. **CTA principal apontando pra Hotmart/checkout real.** Nunca placeholder em producao.
+14. **CTA principal apontando pra checkout real.** Nunca placeholder em producao.
 15. **Recriar fiel ao original.** Se esta integrando uma landing existente em outra, recrie EXATAMENTE igual. Nunca simplificar campos, nunca cortar secoes sem ordem explicita.
 16. **Apresentar os 10 estilos antes de codar.** Nao escolher por conta propria. O dono escolhe.
 17. **Aguardar OK explicito.** Sem "pode fazer", sem "ok", sem "vai", nao sair codando.
@@ -560,7 +560,7 @@ Marque cada item antes de mandar para o dono.
 - [ ] Atalhos de teclado funcionando (em apostila/doc/slides quando aplicavel).
 - [ ] Pixel/tracking configurado (se landing comercial).
 - [ ] Meta Pixel disparando `PageView` no carregamento.
-- [ ] CTA principal apontando para Hotmart/checkout real (nao `#`).
+- [ ] CTA principal apontando para checkout real (nao `#`).
 - [ ] OG image carregando (testar com WhatsApp/Telegram preview).
 - [ ] Sem texto sobre personagens (regra slides).
 - [ ] Sem flash branco em transicoes.
